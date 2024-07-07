@@ -15,7 +15,12 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-
+      
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          
       - name: Set up Node.js version
         uses: actions/setup-node@v3
         with:
@@ -44,6 +49,34 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: node-app
+
+      - name: Login to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}   
+
+      - name: Fetch secrets from Key Vault
+        id: fetch-secrets
+        run: |
+          az keyvault secret show --name DATABASE-NAME --vault-name ${{ secrets.KEY_VAULT_NAME }} --query value -o tsv > database_name.txt
+          az keyvault secret show --name DATABASE-URL --vault-name ${{ secrets.KEY_VAULT_NAME }} --query value -o tsv > database_url.txt
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+      - name: Set environment variables
+        run: |
+          echo "DATABASE_NAME=$(cat database_name.txt)" >> $GITHUB_ENV
+          echo "DATABASE_URL=$(cat database_url.txt)" >> $GITHUB_ENV
+
+      - name: Use secrets in your steps
+        run: |
+          echo "Database Name: $DATABASE_NAME"
+          echo "Database URL: $DATABASE_URL"
+        env:
+          DATABASE_NAME: ${{ env.DATABASE_NAME }}
+          DATABASE_URL: ${{ env.DATABASE_URL }}
       
       - name: 'Deploy to Azure Web App'
         id: deploy-to-webapp
